@@ -22,15 +22,15 @@ def lsq_const(A,b,E = None,f = None,G = None,h = None,obj_only = True):
     P =  np.matmul(A.T,A) # make sure P is symmetric
     q = -np.matmul(A.T,b)
     
-    f = np.array(f * 1.).reshape((-1,1))
-    f_d = f.shape[0]
-    E = np.array(E).reshape((f_d,-1))
-    
     args = [cvxopt.matrix(P), cvxopt.matrix(q)]
     if G is not None:
         args.extend([-cvxopt.matrix(G), -cvxopt.matrix(h)])
-        if A is not None:
-            args.extend([cvxopt.matrix(E), cvxopt.matrix(f)])
+    if E is not None:
+        f = np.array(f * 1.).reshape((-1,1))
+        f_d = f.shape[0]
+        E = np.array(E).reshape((f_d,-1))    
+        args.extend([cvxopt.matrix(E), cvxopt.matrix(f)])
+        
     cvxopt.solvers.options['show_progress'] = False
     sol = cvxopt.solvers.qp(*args)
     if 'optimal' not in sol['status']:
