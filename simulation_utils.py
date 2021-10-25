@@ -132,7 +132,7 @@ def visual_membership(Pi,label = None,node_id = False):
 
 
 
-def visual_membership_T(Pi,label = None,nrow = 1,node_id = False):
+def visual_membership_T(Pi,label = None,nrow = 1,node_id = False, figsize_factor = 10, fontsize = 15):
     '''
     Visualize the membership of items accross T snapshots
     -----------------------------------------
@@ -147,7 +147,7 @@ def visual_membership_T(Pi,label = None,nrow = 1,node_id = False):
     coordinate = Pi @ vertex
 
     ncol = np.floor(T/nrow) + 1 * (T % nrow != 0)
-    f = plt.figure(figsize=(nrow * 15, ncol * 15))
+    f = plt.figure(figsize=(nrow * 10, ncol * 10))
 
     col_list = ['red','green','blue']
     
@@ -170,7 +170,7 @@ def visual_membership_T(Pi,label = None,nrow = 1,node_id = False):
             # add id of nodes
         if node_id:
             for i in range(n):
-                plt.text(coordinate[t,i,0], coordinate[t,i,1], str(i), fontsize=10)
+                plt.text(coordinate[t,i,0], coordinate[t,i,1], str(i), fontsize=fontsize)
 
     plt.tight_layout()
     return f
@@ -205,6 +205,7 @@ def visual_gamma(gamma,label = None):
 
 
 def cluster_error(Pi,Pi_hat):
+    n, K = Pi.shape
     cluster = Pi.argmax(axis = 1)
     permut = list(permutations(range(K)))
     cluster_hat = Pi_hat.argmax(axis = 1)
@@ -446,7 +447,7 @@ def generate_LNMMSB_symmetry(N,K,mu,Sigma,B):
 
 
 
-def generate_dMMSB(N,K,T,nv,Phi,A,Sigma,l,psi,b,B = None):
+def generate_dMMSB_original(N,K,T,nv,Phi,A,Sigma,l,psi,b,B = None):
     '''
     generate T networks from dMMSB on page 543 of Xing et al 2010.
     -------------------
@@ -513,3 +514,78 @@ def generate_dMMSB(N,K,T,nv,Phi,A,Sigma,l,psi,b,B = None):
     return E.transpose((2,0,1)), Mu.T, Label.T, Pi.transpose((2,0,1)), Gamma.transpose((2,0,1)), Z_indicator, B.transpose((2,0,1))
 
 
+
+def generate_dMMSB(N,K,T,nv,Phi,Sigma_e,Sigma,l,psi,b,B = None):
+    '''
+    generate T networks from a modified dMMSB
+    -------------------
+    Arguments:
+        Sigma (K x K x T array)
+    
+    Returns
+        E (T x N x N array): E[:,:,t] is the observed adjacency matrix at time t
+        Mu (T x K array): Mu[:,t] is
+        Label (T x N array)
+        Pi (T x N x K array)
+        Gamma (T x N x K array)
+        Z_indicator (N x N x T x 2 array): Z_indicator[i,j,t,0] is the index of 1 in z_{i->j}^{(t)}, 
+                              Z_indicator[i,j,t,1] is the index of 1 in z_{j->i}^{(t)}
+        B (T x K x K array):
+    '''
+    Mu = np.zeros((T,K))
+    Pi = np.zeros((T,N,K))
+    Gamma = np.zeros((T,N,K))
+    E = np.zeros((T,N,N)) # observed adjacency matrix of the network
+    Z_indicator = np.zeros((T,N,N,2))
+    Q = np.zeros((T,N,N))
+    Label = np.zeros((T,N))
+
+    Mu[0,:] = np.random.multivariate_normal(nv,Phi)
+    gamma = np.random.multivariate_normal(Mu[0,:],Sigma[0,:,:],size = N) #[N,K]
+    C = np.log(np.exp(gamma).sum(axis = 1,keepdims = True))
+    C = np.tile(C,(1,K))
+    pi = np.exp(gamma - C)
+    label = pi.argmax(axis = 1)
+    Pi[0,:,:] = pi
+    Gamma[0,:,:] = gamma
+    Label[0,:] = label
+    
+    for t in range(1,T):
+        epsilon = np.random.multivariate_normal(np.zeros(K),Sigma_e,size = N) #[N,K]
+        gamma_pre = gamma.copy() 
+        gamma = gamma_pre + epsilon
+        C = np.log(np.exp(gamma).sum(axis = 1,keepdims = True))
+        C = np.tile(C,(1,K))
+        pi = np.exp(gamma - C)
+        label = pi.argmax(axis = 1)
+        Pi[t,:,:] = pi
+        Gamma[t,:,:] = gamma
+        Label[t,:] = label
+        
+    if B is None:
+        B = np.zeros((T,K,K))
+        eta = l + np.sqrt(psi) * np.random.randn(K**2).reshape((K,K))
+        B[0,:,:] = np.exp(eta)/(1 + np.exp(eta))
+        for t in range(1,T):
+            eta = b * eta + np.sqrt(psi) * np.random.randn(K**2).reshape((K,K))
+            B[t,:,:] = np.exp(eta)/(1 + np.exp(eta))
+
+    for t in range(T):
+        #### generate z
+        Z_indicator_t = np.zeros((N,N,2))
+        for i in range(N):
+            z_tmp = np.where(np.random.multinomial(1,Pi[t,i,:],2 * N))[1]
+            Z_indicator_t[i,:,0] = z_tmp[0:N]
+            Z_indicator_t[:,i,1] = z_tmp[N:(2 * N)]
+        Z_indicator[t,:,:,:] = Z_indicator_t.astype(int)
+        Z_indicator_t = Z_indicator_t.reshape((N * N,2)).astype(int)
+        B_t = B[t,:,:]
+        Q_t = B_t[Z_indicator_t[:,0],Z_indicator_t[:,1]].reshape(N,N)
+        # E_t is the observed adjacency matrix at time t
+        E_t = np.random.binomial(1,Q_t)
+#         if symmetry:
+#             E_t = np.triu(E_t,1) + np.triu(E_t,1).T
+        E[t,:,:] = E_t
+        Q[t,:,:] = Q_t
+    Label = Label.astype(int)
+    return E, Mu.T, Label.T, Pi, Gamma, Z_indicator, B

@@ -311,16 +311,16 @@ def regularize(R, quantile = 0.05):
     
     radius = np.sum((R - centroid)**2, axis = 1)
     threshold = np.quantile(radius,1 - quantile)
-    outlier_id = np.where(radius > threshold)
+    outlier_id = np.where(radius > threshold)[0]
     outliers = R[outlier_id,:]
-    
     r = np.sum((outliers - centroid)**2, axis = 1)
-    zoom = np.quantile(radius,0.5)
+    zoom = np.quantile(radius,1 - quantile)
     for i in range(outliers.shape[0]):
-        outliers[i,:] = np.sqrt(zoom/r) * (outliers[i,:] - centroid) + centroid
+        outliers[i,:] = np.sqrt(zoom/r[i]) * (outliers[i,:] - centroid) + centroid
     R_reg = R.copy()
     R_reg[outlier_id,:] = outliers
     return R_reg
+
 
 
 def score_dMMSB(K, E, verbose = 0):
@@ -399,3 +399,22 @@ def match_two_pi(Pi_1,Pi_2):
     cluster_2 = Pi_2.argmax(axis = 1)
     
     return Pi_2_reorder
+
+
+
+def mismatch_two_pi(Pi_1, Pi_2):
+    N, K = Pi_1.shape
+   
+    cluster_1 = Pi_1.argmax(axis = 1)
+    cluster_2 = Pi_2.argmax(axis = 1)
+    return np.sum(cluster_1 != cluster_2)
+
+
+
+
+##### some unit tests
+
+# P1 = np.array([[1,0,0],[0,1,0],[0,0,1]])
+# P2 = np.array([[0,0,1],[1,0,0],[0,1,0]])
+# P2_ = match_two_pi(P1, P2)
+# P2_
