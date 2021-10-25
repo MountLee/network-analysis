@@ -237,7 +237,7 @@ def score(A, K, threshold = None):
     R = regularize(R, quantile = 0.05)
     
     if threshold is None:
-        threshold = np.log(n)
+        threshold = 10 * np.log(n)
     R[R > threshold] = threshold
     R[R < -threshold] = -threshold
     

@@ -12,7 +12,6 @@ import igraph
 #######################################
 
 
-
 def visual_network(adj,label = None,color = None):
     # get the row, col indices of the non-zero elements in the adjacency matrix
     conn_indices = np.where(adj)
@@ -42,9 +41,14 @@ def visual_network(adj,label = None,color = None):
 
     # plot the graph
     visual_style = {}
-    visual_style["layout"] = G.layout_kamada_kawai()
-    visual_style["bbox"] = (300, 300)
-    visual_style["margin"] = 10
+#     visual_style["layout"] = G.layout_kamada_kawai()
+#     visual_style["bbox"] = (300, 300)
+#     visual_style["margin"] = 10
+#     visual_style["layout"] = G.layout_sphere()
+#     visual_style["layout"] = G.layout_reingold_tilford()
+#     visual_style["layout"] = G.layout_fruchterman_reingold()
+    visual_style["layout"] = G.layout_lgl()
+#     visual_style["layout"] = G.layout_circle()
     visual_style["labels"] = True
 
     f = igraph.plot(G, **visual_style)
